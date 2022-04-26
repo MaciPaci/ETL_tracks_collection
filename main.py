@@ -34,11 +34,12 @@ tables_to_create = [
     create_tracks_play_history_table
 ]
 
-tables = [
-    "tracks_collection",
-    "unique_tracks",
-    "tracks_play_history"
-]
+
+# tables = [
+#     "tracks_collection",
+#     "unique_tracks",
+#     "tracks_play_history"
+# ]
 
 
 def create_tables(db_cursor):
@@ -69,10 +70,10 @@ def main():
         with open(tracks_path, 'r', encoding='latin-1') as f:
             c = 0
             for line in f:
-                if c >= 100:
+                if c >= 10000:
                     break
                 tracks = line.strip().split('<SEP>')
-                print(tracks)
+                # print(tracks)
                 if len(tracks) == 4:
                     db_cursor.execute('INSERT INTO unique_tracks VALUES (?, ?, ?, ?)', tracks)
                 c += 1
@@ -81,17 +82,25 @@ def main():
         with open(triplets_path, 'r', encoding='latin-1') as f:
             c = 0
             for line in f:
-                if c >= 100:
+                if c >= 10000:
                     break
                 triplets = line.strip().split('<SEP>')
-                print(triplets)
+                # print(triplets)
                 if len(triplets) == 3:
                     db_cursor.execute('INSERT INTO tracks_play_history (user_id, track_id, play_date) VALUES (?, ?, ?)',
                                       triplets)
                 c += 1
         f.close()
 
-    for row in db_cursor.execute('SELECT * FROM tracks_play_history'):
+    for row in db_cursor.execute(
+            'SELECT track_id, COUNT(*) FROM tracks_play_history WHERE track_id = "SOQMMHC12AB0180CB8"'):
+        print(row)
+
+    for row in db_cursor.execute('''
+    SELECT u.track_id, u.artist, u.title, t.count FROM unique_tracks AS u 
+    LEFT JOIN (SELECT track_id, COUNT(*) as count FROM tracks_play_history GROUP BY track_id) as t
+    ON u.track_id = t.track_id GROUP BY t.count
+    '''):
         print(row)
 
 
