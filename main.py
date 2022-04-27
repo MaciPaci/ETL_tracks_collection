@@ -75,7 +75,7 @@ def main():
             if len(tracks) == 4:
                 try:
                     db_cursor.execute('INSERT INTO unique_tracks VALUES (?, ?, ?, ?)', tracks)
-                except IntegrityError as e:
+                except IntegrityError:
                     rows_omitted += 1
                     continue
             else:
@@ -128,10 +128,12 @@ def main():
     SELECT title, play_count FROM tracks_collection ORDER BY play_count DESC
     ''')
     list_of_songs_with_play_count = db_cursor.fetchmany(5)
-    songs, play_count = zip(*list_of_songs_with_play_count)
+    print("Songs", list_of_songs_with_play_count)
     print("Five most played songs in the collection:")
-    for song, played in songs, play_count:
-        print(song, "was played", played, "times")
+    for index, tuple in enumerate(list_of_songs_with_play_count):
+        song = tuple[0]
+        play_count = tuple[1]
+        print(song, "was played", play_count, "times")
 
     db_cursor.close()
     db_connector.close()
