@@ -105,6 +105,17 @@ def main():
     ''')
     db_connector.commit()
 
+    db_cursor.execute('''
+    SELECT artist, SUM(play_count) FROM tracks_collection 
+    GROUP BY artist ORDER BY SUM(play_count) DESC LIMIT 1
+    ''')
+    print(db_cursor.fetchone())
+
+    db_cursor.execute('''
+    SELECT title, play_count FROM tracks_collection ORDER BY play_count DESC
+    ''')
+    print(db_cursor.fetchmany(5))
+
     db_cursor.close()
     db_connector.close()
 
