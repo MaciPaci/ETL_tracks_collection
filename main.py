@@ -122,13 +122,12 @@ def main():
     GROUP BY artist ORDER BY SUM(play_count) DESC LIMIT 1
     ''')
     (artist, play_count) = db_cursor.fetchone()
-    print("Artist with the most played songs in the collection:", artist, "songs played:", play_count)
+    print("Artist with the most played songs in the collection:", artist, "; songs played:", play_count)
 
     db_cursor.execute('''
     SELECT title, play_count FROM tracks_collection ORDER BY play_count DESC
     ''')
     list_of_songs_with_play_count = db_cursor.fetchmany(5)
-    print("Songs", list_of_songs_with_play_count)
     print("Five most played songs in the collection:")
     for index, tuple in enumerate(list_of_songs_with_play_count):
         song = tuple[0]
