@@ -1,12 +1,12 @@
 import argparse
-from sqlite3 import connect
+from sqlite3 import connect, IntegrityError
 
 create_tracks_collection_table = '''
 CREATE TABLE tracks_collection(
     track_id VARCHAR(255) PRIMARY KEY,
     artist VARCHAR(255),
     title VARCHAR(255),
-    play_count INTEGER
+    play_count INTEGER DEFAULT 0
 )
 '''
 
@@ -35,13 +35,6 @@ tables_to_create = [
 ]
 
 
-# tables = [
-#     "tracks_collection",
-#     "unique_tracks",
-#     "tracks_play_history"
-# ]
-
-
 def create_tables(db_cursor):
     for table in tables_to_create:
         db_cursor.execute(table)
@@ -62,46 +55,58 @@ def main():
     tracks_path = args.tracks
     triplets_path = args.triplets
 
-    with connect('track_library.db') as db_connector:
-        db_cursor = db_connector.cursor()
-        remove_tables(db_cursor)
-        create_tables(db_cursor)
+    db_connector = connect('track_library.db')
+    db_cursor = db_connector.cursor()
+    remove_tables(db_cursor)
+    create_tables(db_cursor)
 
-        with open(tracks_path, 'r', encoding='latin-1') as f:
-            c = 0
-            for line in f:
-                if c >= 10000:
-                    break
-                tracks = line.strip().split('<SEP>')
-                # print(tracks)
-                if len(tracks) == 4:
+    rows_omitted = 0
+
+    with open(tracks_path, 'r', encoding='latin-1') as f:
+        c = 0
+        for line in f:
+            tracks = line.strip().split('<SEP>')
+            if len(tracks) == 4:
+                try:
                     db_cursor.execute('INSERT INTO unique_tracks VALUES (?, ?, ?, ?)', tracks)
-                c += 1
-        f.close()
+                except IntegrityError as e:
+                    rows_omitted += 1
+                    continue
+            else:
+                rows_omitted += 1
+            c += 1
+    db_connector.commit()
+    print("Total", c, "records inserted successfully into unique_tracks table")
+    print("Total", rows_omitted, "records omitted from unique_tracks table")
+    f.close()
 
-        with open(triplets_path, 'r', encoding='latin-1') as f:
-            c = 0
-            for line in f:
-                if c >= 10000:
-                    break
-                triplets = line.strip().split('<SEP>')
-                # print(triplets)
-                if len(triplets) == 3:
-                    db_cursor.execute('INSERT INTO tracks_play_history (user_id, track_id, play_date) VALUES (?, ?, ?)',
-                                      triplets)
-                c += 1
-        f.close()
+    rows_omitted = 0
 
-    for row in db_cursor.execute(
-            'SELECT track_id, COUNT(*) FROM tracks_play_history WHERE track_id = "SOQMMHC12AB0180CB8"'):
-        print(row)
+    with open(triplets_path, 'r', encoding='latin-1') as f:
+        c = 0
+        for line in f:
+            triplets = line.strip().split('<SEP>')
+            if len(triplets) == 3:
+                db_cursor.execute('INSERT INTO tracks_play_history (user_id, track_id, play_date) VALUES (?, ?, ?)',
+                                  triplets)
+            else:
+                rows_omitted += 1
+            c += 1
+    db_connector.commit()
+    print("Total", c, "records inserted successfully into tracks_play_history table")
+    print("Total", rows_omitted, "records omitted from tracks_play_history table")
+    f.close()
 
-    for row in db_cursor.execute('''
-    SELECT u.track_id, u.artist, u.title, t.count FROM unique_tracks AS u 
+    db_cursor.execute('''
+    INSERT INTO tracks_collection
+    SELECT u.track_id, u.artist, u.title, t.count FROM unique_tracks AS u
     LEFT JOIN (SELECT track_id, COUNT(*) as count FROM tracks_play_history GROUP BY track_id) as t
-    ON u.track_id = t.track_id GROUP BY t.count
-    '''):
-        print(row)
+    ON u.track_id = t.track_id ORDER BY t.count DESC
+    ''')
+    db_connector.commit()
+
+    db_cursor.close()
+    db_connector.close()
 
 
 if __name__ == '__main__':
