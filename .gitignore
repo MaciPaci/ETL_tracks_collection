@@ -1,3 +1,4 @@
 /.idea
 /track_library.db
-/data
+/data/triplets_sample_20p.txt
+/data/unique_tracks.txt
