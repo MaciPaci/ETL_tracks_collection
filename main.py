@@ -2,37 +2,12 @@ import argparse
 from sqlite3 import connect, IntegrityError
 from timeit import default_timer as timer
 
-create_tracks_collection_table = '''
-CREATE TABLE tracks_collection(
-    track_id VARCHAR(255) PRIMARY KEY,
-    artist VARCHAR(255),
-    title VARCHAR(255),
-    play_count INTEGER DEFAULT 0
-)
-'''
-
-create_unique_tracks_table = '''
-CREATE TABLE unique_tracks(
-    play_id VARCHAR(255),
-    track_id VARCHAR(255) PRIMARY KEY,
-    artist VARCHAR(255),
-    title VARCHAR(255)
-)
-'''
-
-create_tracks_play_history_table = '''
-CREATE TABLE tracks_play_history(
-    id INTEGER PRIMARY KEY,
-    user_id VARCHAR(255),
-    track_id VARCHAR(255),
-    play_date TIMESTAMP
-)
-'''
+from store.db_queries import *
 
 tables_to_create = [
-    create_tracks_collection_table,
-    create_unique_tracks_table,
-    create_tracks_play_history_table
+    create_tracks_collection_table_query,
+    create_unique_tracks_table_query,
+    create_tracks_play_history_table_query
 ]
 
 
@@ -44,9 +19,9 @@ def create_tables(db_cursor):
 
 
 def remove_tables(db_cursor):
-    db_cursor.execute('DROP TABLE IF EXISTS tracks_collection')
-    db_cursor.execute('DROP TABLE IF EXISTS unique_tracks')
-    db_cursor.execute('DROP TABLE IF EXISTS tracks_play_history')
+    db_cursor.execute(drop_tracks_collection_query)
+    db_cursor.execute(drop_unique_tracks_query)
+    db_cursor.execute(drop_tracks_play_history_query)
 
 
 def main():
@@ -74,7 +49,7 @@ def main():
             tracks = line.strip().split('<SEP>')
             if len(tracks) == 4:
                 try:
-                    db_cursor.execute('INSERT INTO unique_tracks VALUES (?, ?, ?, ?)', tracks)
+                    db_cursor.execute(fill_unique_tracks_query, tracks)
                 except IntegrityError:
                     rows_omitted += 1
                     continue
@@ -97,8 +72,7 @@ def main():
         for line in f:
             triplets = line.strip().split('<SEP>')
             if len(triplets) == 3:
-                db_cursor.execute('INSERT INTO tracks_play_history (user_id, track_id, play_date) VALUES (?, ?, ?)',
-                                  triplets)
+                db_cursor.execute(fill_tracks_play_history_query, triplets)
             else:
                 rows_omitted += 1
             c += 1
@@ -109,24 +83,14 @@ def main():
     print("Total", rows_omitted, "records omitted from tracks_play_history table")
     print("File", triplets_path, "processing took", triplets_end_time - triplets_start_time, "seconds to complete")
 
-    db_cursor.execute('''
-    INSERT INTO tracks_collection
-    SELECT u.track_id, u.artist, u.title, t.count FROM unique_tracks AS u
-    LEFT JOIN (SELECT track_id, COUNT(*) as count FROM tracks_play_history GROUP BY track_id) as t
-    ON u.track_id = t.track_id ORDER BY t.count DESC
-    ''')
+    db_cursor.execute(fill_tracks_collection_query)
     db_connector.commit()
 
-    db_cursor.execute('''
-    SELECT artist, SUM(play_count) FROM tracks_collection 
-    GROUP BY artist ORDER BY SUM(play_count) DESC LIMIT 1
-    ''')
+    db_cursor.execute(get_most_listened_artist_query)
     (artist, play_count) = db_cursor.fetchone()
     print("Artist with the most played songs in the collection:", artist, "; songs played:", play_count)
 
-    db_cursor.execute('''
-    SELECT title, play_count FROM tracks_collection ORDER BY play_count DESC
-    ''')
+    db_cursor.execute(get_most_played_songs_query)
     list_of_songs_with_play_count = db_cursor.fetchmany(5)
     print("Five most played songs in the collection:")
     for index, tuple in enumerate(list_of_songs_with_play_count):
